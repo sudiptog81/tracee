@@ -18,6 +18,14 @@ dist/tracee: $(SRC) tracee/event_monitor_ebpf.c
 test:
 	go test -v ./...
 
+.PHONY: test-docker
+test-docker: clean
+	img=$$(docker build --target builder -q  .) && \
+	cnt=$$(docker run $$img) && \
+	docker exec -it $$cnt make test && \
+	docker stop $$cnt && \
+	docker rm $$cnt ; docker rmi $$img
+
 .PHONY: clean
 clean:
 	rm -rf dist || true
