@@ -54,6 +54,7 @@ jobs:
           sudo apt install -y bison build-essential cmake flex git libedit-dev \
               llvm libllvm10 llvm-dev libclang-dev  python zlib1g-dev libelf-dev \
               libtinfo5 libfl-dev
+          git submodule update --init
           sudo make bpf
 
       - name: Run Tests
