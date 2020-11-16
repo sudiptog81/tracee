@@ -52,7 +52,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install -y bison build-essential cmake flex git libedit-dev \
-              libllvm9 llvm-9-dev libclang-9-dev  python zlib1g-dev libelf-dev \
+              llvm-9 libllvm9 llvm-9-dev libclang-9-dev  python zlib1g-dev libelf-dev \
               libtinfo5 libfl-dev
           sudo make bpf
 
