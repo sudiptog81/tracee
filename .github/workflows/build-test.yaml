@@ -48,22 +48,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      - name: Lint
-        run: |
-          if test -z "$(gofmt -l .)"; then
-            echo "Congrats! There is nothing to fix."
-          else
-            echo "The following lines should be fixed."
-            gofmt -s -d .
-            exit 1
-          fi
-
       - name: Install Libraries
         run: |
           sudo apt-get update
           sudo apt install -y bison build-essential cmake flex git libedit-dev \
               libllvm9 llvm-9-dev libclang-9-dev  python zlib1g-dev libelf-dev \
               libtinfo5 libfl-dev
+          sudo make bpf
 
       - name: Run Tests
         run: make test
