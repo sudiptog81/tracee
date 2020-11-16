@@ -1,6 +1,16 @@
 // +build ignore
 // ^^ this is a golang build tag meant to exclude this C file from compilation by the CGO compiler
 
+/* In Linux 5.4 asm_inline was introduced, but it's not supported by clang.
+ * Redefine it to just asm to enable successful compilation.
+ * see https://github.com/iovisor/bcc/commit/2d1497cde1cc9835f759a707b42dea83bee378b8 for more details
+ */
+#include <linux/types.h>
+#ifdef asm_inline
+#undef asm_inline
+#define asm_inline asm
+#endif
+
 #include <uapi/linux/ptrace.h>
 #include <uapi/linux/in.h>
 #include <uapi/linux/in6.h>
@@ -21,7 +31,6 @@
 
 #include <uapi/linux/bpf.h>
 #include <linux/kconfig.h>
-#include <linux/types.h>
 #include <linux/version.h>
 
 #undef container_of
@@ -94,7 +103,8 @@
 #define VFS_WRITE           341
 #define VFS_WRITEV          342
 #define MEM_PROT_ALERT      343
-#define MAX_EVENT_ID        344
+#define SCHED_PROCESS_EXIT  344
+#define MAX_EVENT_ID        345
 
 #define CONFIG_MODE             0
 #define CONFIG_SHOW_SYSCALL     1
@@ -1384,6 +1394,34 @@ int syscall__execveat(void *ctx)
 
 /*============================== OTHER HOOKS ==============================*/
 
+SEC("raw_tracepoint/sched_process_exit")
+int tracepoint__sched__sched_process_exit(
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+void *ctx
+#else
+struct bpf_raw_tracepoint_args *ctx
+#endif
+)
+{
+    if (!should_trace())
+        return 0;
+
+    if (get_config(CONFIG_MODE) == MODE_CONTAINER_NEW)
+        remove_pid_ns_if_needed();
+    else
+        remove_pid();
+
+    buf_t *submit_p = get_buf(SUBMIT_BUF_IDX);
+    if (submit_p == NULL)
+        return 0;
+    set_buf_off(SUBMIT_BUF_IDX, sizeof(context_t));
+
+    init_and_save_context(submit_p, SCHED_PROCESS_EXIT, 0, 0);
+
+    events_perf_submit(ctx);
+    return 0;
+}
+
 SEC("kprobe/do_exit")
 int BPF_KPROBE(trace_do_exit)
 {
@@ -1398,11 +1436,6 @@ int BPF_KPROBE(trace_do_exit)
     long code = PT_REGS_PARM1(ctx);
 
     init_and_save_context(submit_p, DO_EXIT, 0, code);
-
-    if (get_config(CONFIG_MODE) == MODE_CONTAINER_NEW)
-        remove_pid_ns_if_needed();
-    else
-        remove_pid();
 
     events_perf_submit(ctx);
     return 0;
